@@ -1,0 +1,128 @@
+name: release
+
+# Publishes to npm when a v* tag is pushed, using npm Trusted Publishing (OIDC).
+# No NPM_TOKEN secret is involved: GitHub mints a short-lived OIDC token, npm
+# verifies it against the trusted publisher configured on the package, and the
+# publish carries a provenance attestation.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write # the GitHub Release is created from the tag
+  id-token: write # required for Trusted Publishing and provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Check the tag matches package.json
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          echo "tag=$tag package=$pkg"
+          test "$tag" = "$pkg" || { echo "::error::tag $tag does not match package version $pkg"; exit 1; }
+
+      - name: Point the README install examples at this version
+        # The tarball carries README.md, so npm shows whatever version the file
+        # happened to mention. Stamping it here keeps the pin examples on the
+        # npm page and on GitHub identical to the released number, without a
+        # manual follow-up commit after every release.
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          sed -i -E "s/@[0-9]+\.[0-9]+\.[0-9]+/@${version}/g; s/#v[0-9]+\.[0-9]+\.[0-9]+/#v${version}/g" README.md
+          grep -nE "@${version}|#v${version}" README.md || true
+
+      - name: Keep the published README user-facing
+        # README.md ships to GitHub and to npm with every release, so it is the
+        # user-facing page and must stay that way: what the plugin does and how
+        # to use it. Test counts, verification matrices and the release runbook
+        # belong in RELEASE.md / CHANGELOG.md, never here. Failing this step
+        # blocks the publish, which keeps every future version in sync.
+        run: |
+          forbidden='自测|已验证|未验证|冒烟|依赖的宿主|宿主内部|smoke test|Verified on|^### Tests|^### Releasing|Host internals'
+          if grep -nE "$forbidden" README.md; then
+            echo "::error::README.md must stay user-facing; move tests/verification/release notes to RELEASE.md"
+            exit 1
+          fi
+          echo "README.md is user-facing"
+
+      - name: Check the license ships with every release
+        # The custom license is what tells people they may not republish a
+        # modified build, so it has to stay declared and inside the tarball.
+        run: |
+          node -e "const p=require('./package.json'); if(!p.license){console.error('::error::package.json must declare a license');process.exit(1)} if(!Array.isArray(p.files)||!p.files.includes('LICENSE')){console.error('::error::LICENSE must stay in package.json files');process.exit(1)}"
+
+      - name: Smoke tests
+        run: |
+          node test/host-smoke.mjs
+          node test/client-smoke.cjs
+
+      - name: Publish
+        # --provenance also writes the attestation, so the tarball is verifiable.
+        # Idempotent: a version that is already on the registry (for example one
+        # published by hand before Trusted Publishing was configured) is skipped
+        # instead of failing the run.
+        run: |
+          name="$(node -p "require('./package.json').name")"
+          version="$(node -p "require('./package.json').version")"
+          encoded="${name/\//%2F}"
+          status="$(curl -s -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/${encoded}/${version}")"
+          echo "registry status for ${name}@${version}: ${status}"
+          if [ "$status" = "200" ]; then
+            echo "::notice::${name}@${version} is already published; skipping npm publish."
+            exit 0
+          fi
+          npm publish --access public --provenance
+
+      - name: Commit the stamped README back to the branch
+        # The step above edits README.md inside the runner only, so npm gets the
+        # fresh examples while GitHub would keep the old ones. Push the stamped
+        # file back to main so both pages show the same version pins. The run is
+        # triggered by a tag, so HEAD is detached at the released commit; pushing
+        # it to main only works while main still points there, and a protected
+        # branch may reject the bot. Either way the release itself stays valid.
+        run: |
+          if git diff --quiet -- README.md; then
+            echo "::notice::README already points at ${GITHUB_REF_NAME}; nothing to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "docs: point the install examples at ${GITHUB_REF_NAME}"
+          git push origin HEAD:main || echo "::warning::could not push the README stamp back to main (moved or protected); the npm README is still stamped"
+
+      - name: Create the GitHub Release
+        # Keeps the Releases page in step with npm: the tag that triggered this
+        # run becomes a Release whose notes come from the CHANGELOG section for
+        # that version. Idempotent, so re-pushing a tag never fails here.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "::notice::release $GITHUB_REF_NAME already exists; skipping"
+            exit 0
+          fi
+          version="${GITHUB_REF_NAME#v}"
+          notes="$(awk -v v="$version" '
+            /^## \[/ {
+              if (found) exit
+              if (index($0, "[" v "]") > 0) { found = 1; next }
+            }
+            found { print }
+          ' CHANGELOG.md)"
+          if [ -n "$notes" ]; then
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "$notes" --verify-tag
+          else
+            echo "::notice::no CHANGELOG section for $version; falling back to generated notes"
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+          fi

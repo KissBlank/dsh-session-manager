@@ -1,0 +1,86 @@
+版权所有 © 2026 Kiss_Blank（下称「作者」）。保留所有权利。
+Copyright © 2026 Kiss_Blank (the "Author"). All rights reserved.
+
+dsh-session-manager（下称「本软件」）
+dsh-session-manager (the "Software")
+
+适用范围：本许可自 0.4.0 版起适用。0.3.5 及更早的版本按其发布时的 MIT 许可证授权，不受本文件影响（这些版本仍保留在 git 历史与 npm 上）。
+Scope: this license applies from version 0.4.0 onward. Versions 0.3.5 and earlier remain licensed under the MIT License that shipped with them (those versions stay in the git history and on npm).
+
+---
+
+## 1. 允许你做的事
+
+在遵守本许可的前提下，作者免费授予你一项全球范围、非独占、不可转让、可撤销的许可：
+
+1. **安装与使用**：在你自己或你所在组织的设备上安装、运行本软件，数量不限。
+2. **自用修改**：为个人使用或组织内部使用而修改源码，只要修改后的副本不对外分发、不上架、不发布。
+3. **备份与迁移**：为备份、测试、迁移目的复制本软件。
+4. **反馈**：提交 issue、参与讨论与提交 Pull Request。
+
+以上许可不收取费用，也不需要事先申请。
+
+## 2. 未经作者事先书面许可，你不得
+
+1. **再分发**：以任何形式分发、上传、镜像、转贴本软件或其副本，包括但不限于其他插件市场、代码托管平台、网盘、安装包、容器镜像、对外共享的制品库。
+2. **发布修改版**：发布、托管、上架、公开分享基于本软件的修改版、fork 或衍生作品。为向上游提交 Pull Request 而创建的 fork 允许存在，但不得作为独立产品对外发布。
+3. **商业化**：出售、出租、按次/按期收费、转授权，或作为付费产品、付费服务、代管服务的一部分提供本软件。
+4. **去除标识**：删除、遮蔽或修改本软件中的版权声明、作者署名、插件名称、本许可文件或许可标识。
+5. **暗示背书**：以作者名义宣传，或暗示作者对你的发行版本提供了认可、担保或支持。
+6. **规避限制**：通过改名、拆包、嵌入其他项目等方式规避上述任何一条。
+
+第 1、2 款不限制你在自己组织内部（同一法人实体内的设备与人员）使用和部署自用修改版。
+
+「书面许可」包括电子邮件、GitHub Issue / Pull Request 评论、即时消息等可留存记录的书面形式；口头许可不构成本许可所指的书面许可。
+
+## 3. 贡献
+
+你向本项目提交 Pull Request、补丁或其他贡献，即视为授予作者一项永久、全球范围、免费、不可撤销、可再许可（包括在专有或商业许可下再许可）的权利，允许作者以任何方式使用、修改、合并、发布与再分发你的贡献。作者没有必须合并任何贡献的义务。若你不同意本条款，请不要提交贡献。
+
+## 4. 商业授权与二次发布授权
+
+如需再分发、发布修改版、商业使用或其他本许可未授予的权利，请通过项目主页 https://github.com/KissBlank/dsh-session-manager 联系作者取得单独的书面授权。
+
+## 5. 无担保
+
+本软件按「现状」提供，不附带任何明示或默示的担保，包括但不限于对适销性、特定用途适用性、无侵权、无中断、无数据丢失的担保。你自行承担使用本软件的全部风险；**本软件会不可恢复地删除会话数据，请自行做好备份**。
+
+## 6. 责任限制
+
+在适用法律允许的最大范围内，作者不对因本软件或本许可产生的任何直接、间接、偶然、特殊、惩罚性或后果性损害承担责任，包括但不限于数据丢失、业务中断、利润损失，无论其基于合同、侵权或其他法律依据，即使作者已被告知此类损害的可能性。
+
+## 7. 终止
+
+你违反本许可的任何条款时，本许可授予你的全部权利立即自动终止，你须停止使用并销毁你持有或控制的全部副本。作者保留追究法律责任的权利。授权终止后不会自动恢复，除非作者另行书面同意。
+
+## 8. 适用法律与管辖
+
+本许可适用中华人民共和国法律（不含冲突规范）。因本许可产生的争议，双方应先协商；协商不成的，提交作者所在地有管辖权的人民法院管辖。
+
+## 9. 语言
+
+本许可以中英文双语提供，两种文本具有同等效力；两者不一致时，以中文文本为准。
+
+---
+
+## English text (for readers outside China; the Chinese text prevails)
+
+**Permitted.** Subject to this license, the Author grants you a free, worldwide, non-exclusive, non-transferable, revocable permission to install and run the Software on your own or your organization's devices without limit; to modify it for private or internal use provided the modified copy is not distributed, listed or published; to copy it for backup, testing and migration; and to open issues, discuss and submit pull requests.
+
+**Prohibited without the Author's prior written permission.** You may not: redistribute the Software in any form — including other plugin marketplaces, code-hosting platforms, file-sharing services, installers, container images or externally shared artifact repositories; publish, host, list or publicly share any modified version, fork or derivative work as a product (a fork for opening a pull request is allowed, but must not be published on its own); sell, rent, charge per use, sublicense, or provide the Software as part of a paid product, paid service or managed service; remove or obscure the copyright notice, attribution, plugin name, this license or its identifier; imply that the Author endorses your distribution; or circumvent any of the above by renaming, splitting the package or embedding it into another project. Paragraphs 1 and 2 do not restrict internal use and internal deployment of modified copies within a single legal entity.
+
+"Written permission" means a recorded written form such as email, a GitHub issue or pull-request comment, or an instant message. Oral permission does not qualify.
+
+**Contributions.** By submitting a pull request, patch or any other contribution, you grant the Author a perpetual, worldwide, royalty-free, irrevocable, sublicensable right to use, modify, merge, publish and redistribute your contribution in any way, including under proprietary or commercial terms. The Author is not obliged to merge any contribution. Do not submit contributions if you disagree with this term.
+
+**Commercial and redistribution licensing.** For redistribution, publishing a modified version, commercial use or any other right not granted here, contact the Author through https://github.com/KissBlank/dsh-session-manager to obtain a separate written license.
+
+**No warranty.** The Software is provided "AS IS", without any express or implied warranty, including merchantability, fitness for a particular purpose, non-infringement, uninterrupted operation or freedom from data loss. You use the Software entirely at your own risk; **it deletes session data irreversibly — keep your own backups**.
+
+**Limitation of liability.** To the maximum extent permitted by law, the Author is not liable for any direct, indirect, incidental, special, punitive or consequential damages arising from the Software or this license, including data loss, business interruption or lost profits, whether in contract, tort or otherwise, even if advised of the possibility of such damages.
+
+**Termination.** Any breach terminates all rights granted to you immediately; you must stop using the Software and destroy all copies you hold or control. Terminated rights are not restored unless the Author agrees in writing.
+
+**Governing law and jurisdiction.** This license is governed by the laws of the People's Republic of China, excluding its conflict-of-law rules. Disputes shall first be negotiated in good faith; failing that, they are submitted to the competent people's court at the Author's place of residence.
+
+**Language.** This license is provided in Chinese and English with equal effect; where they differ, the Chinese text prevails.

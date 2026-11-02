@@ -1,0 +1,6 @@
+# Session Manager mounts one plugin row. Its browser half rides the same row:
+# dsh-client-modules reads `dsh.client` from this package's manifest and adds
+# `./client` to the web boot graph.
+- insert:
+    - id: session-manager
+      name: '@kissblank/dsh-session-manager'
