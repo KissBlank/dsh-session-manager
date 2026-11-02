@@ -1,6 +1,6 @@
 {
   "name": "@kissblank/dsh-session-manager",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "Purge DSH Sessions for good, and manage them from one console: bulk delete, archive filters, search and sort.",
   "license": "SEE LICENSE IN LICENSE",
