@@ -4,8 +4,8 @@ Copyright © 2026 Kiss_Blank (the "Author"). All rights reserved.
 dsh-session-manager（下称「本软件」）
 dsh-session-manager (the "Software")
 
-适用范围：本许可自 0.4.0 版起适用。0.3.5 及更早的版本按其发布时的 MIT 许可证授权，不受本文件影响（这些版本仍保留在 git 历史与 npm 上）。
-Scope: this license applies from version 0.4.0 onward. Versions 0.3.5 and earlier remain licensed under the MIT License that shipped with them (those versions stay in the git history and on npm).
+适用范围：本许可适用于本软件及其全部版本。
+Scope: this license applies to this software and to every version of it.
 
 ---
 

@@ -6,7 +6,7 @@
 
 ## [1.0.0] - 2026-11-02
 
-仓库与 npm 包统一为 `@kissblank/dsh-session-manager`，版本号从 1.0.0 重新开始。此前 0.x 的试验包（`@kissblank/dsh-sessions` 等）与其历史版本已下线，不再提供。
+仓库与 npm 包统一为 `@kissblank/dsh-session-manager`，版本号从 1.0.0 开始。
 
 ### 新增
 

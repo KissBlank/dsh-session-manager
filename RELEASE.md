@@ -22,7 +22,7 @@
 | Workflow filename | `release.yml` |
 | Environment | 留空 |
 | Permissions | `npm publish` + `npm stage publish` |
-| Status | **Valid**（0.3.3 那次发布已验证） |
+| Status | 首次通过 CI 发布后自动变 **Valid** |
 
 > 勾了 **Allow npm publish**，所以 CI 是**直接发布**，不需要每次人工批准。若以后想改成"必须人工批准"，把该勾去掉，再把 `release.yml` 的 `npm publish` 换成 `npm stage publish`，然后到 <https://www.npmjs.com/settings/kissblank/staged-packages> 点 Approve。
 
@@ -47,7 +47,7 @@ node test/host-smoke.mjs && node test/client-smoke.cjs
 
 # 3) 先推提交，再单独推 tag
 git -c http.proxy=http://127.0.0.1:7890 -c https.proxy=http://127.0.0.1:7890 push origin main
-git -c http.proxy=http://127.0.0.1:7890 -c https.proxy=http://127.0.0.1:7890 push origin v0.3.3   # 换成实际 tag
+git -c http.proxy=http://127.0.0.1:7890 -c https.proxy=http://127.0.0.1:7890 push origin v1.0.0   # 换成实际 tag
 ```
 
 **tag 要和 main 分开推**：实测把 `main` 和新建的 tag 放进同一次 `push` 时，Actions 没有排队（`actions/runs` 为 0）；删掉 tag 后再单独推一次，流水线立刻就跑起来了。`npm version` 已经建好 tag，所以拆成两条 push 即可。
@@ -118,7 +118,7 @@ tar -xzf "$env:TEMP\a.tgz" -C "$env:TEMP\a"
 ### 3.4 想弃用某个版本
 
 ```bash
-npm deprecate '@kissblank/dsh-session-manager@0.3.1' '0.3.1 的 package.json 带 BOM，装不上，请用 0.3.2'
+npm deprecate '@kissblank/dsh-session-manager@<旧版本>' '<为什么要升级>'
 ```
 
 弃用只是给安装者一条警告，不删除包体（72 小时内也可以 `npm unpublish` 彻底删除，但尽量不要）。
@@ -129,7 +129,7 @@ npm deprecate '@kissblank/dsh-session-manager@0.3.1' '0.3.1 的 package.json 带
 
 - [ ] `CHANGELOG.md` 已写本次改动
 - [ ] `package.json` 的 `version` 已提升，且与 tag 一致
-- [ ] 许可证相关没被动坏：`package.json` 的 `license` 仍是 `SEE LICENSE IN LICENSE`，`LICENSE` 仍在发包文件里，README 的许可说明与 `LICENSE` 一致（0.4.0 起为自定义「保留所有权利」条款，**不再改回 MIT**；旧版本已按 MIT 发布的部分无法追溯撤销）
+- [ ] 许可证相关没被动坏：`package.json` 的 `license` 仍是 `SEE LICENSE IN LICENSE`，`LICENSE` 仍在发包文件里，README 的许可说明与 `LICENSE` 一致（自定义「保留所有权利」条款，**不要改回 MIT**）
 - [ ] `node test/host-smoke.mjs` 通过（当前 43 项）
 - [ ] `node test/client-smoke.cjs` 通过（当前 98 项）
 - [ ] `npm pack --dry-run` 的文件清单符合预期（`lib/`、`locale/`、`assets/`、`cordis.patch.yml`、`LICENSE`、`README.md`）

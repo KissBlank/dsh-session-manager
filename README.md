@@ -75,7 +75,7 @@
 
 ### 许可
 
-个人与组织内部使用免费：可以安装、使用、为了自用改源码。**未经作者事先书面许可，不得再分发本插件、也不得发布修改版或 fork**（为提交 PR 而建的 fork 可以，但不能单独对外发布），不得用于付费产品/服务，不得删除署名与版权声明。商业使用或二次发布请先联系作者。完整条款见 [LICENSE](LICENSE)；0.3.5 及更早的版本仍按当时的 MIT 许可授权。
+个人与组织内部使用免费：可以安装、使用、为了自用改源码。**未经作者事先书面许可，不得再分发本插件、也不得发布修改版或 fork**（为提交 PR 而建的 fork 可以，但不能单独对外发布），不得用于付费产品/服务，不得删除署名与版权声明。商业使用或二次发布请先联系作者。完整条款见 [LICENSE](LICENSE)。
 
 ---
 
@@ -103,6 +103,6 @@ Install through the plugin manager with any of these specs: `@kissblank/dsh-sess
 
 ### License
 
-Free for personal and internal use: install it, use it, modify it for yourself. **You may not redistribute the plugin, or publish a modified version or fork, without the Author's prior written permission** (a fork opened to send a pull request is fine, but must not be published on its own); you may not use it in a paid product or service, and you may not strip the attribution or copyright notice. Contact the Author first for commercial use or redistribution. The full terms are in [LICENSE](LICENSE); versions up to 0.3.5 remain under the MIT License they shipped with.
+Free for personal and internal use: install it, use it, modify it for yourself. **You may not redistribute the plugin, or publish a modified version or fork, without the Author's prior written permission** (a fork opened to send a pull request is fine, but must not be published on its own); you may not use it in a paid product or service, and you may not strip the attribution or copyright notice. Contact the Author first for commercial use or redistribution. The full terms are in [LICENSE](LICENSE).
 
 © 2026 Kiss_Blank — all rights reserved, see [LICENSE](LICENSE)
