@@ -37,7 +37,7 @@ function check(label, condition, detail) {
 
 /* ----------------------------------------------------------------- React */
 
-const hooks = { index: 0, force: new Set() }
+const hooks = { index: 0, force: new Set(), override: new Map() }
 
 const React = {
   createElement(type, props, ...children) {
@@ -47,6 +47,7 @@ const React = {
     const index = hooks.index
     hooks.index += 1
     const value = typeof initial === 'function' ? initial() : initial
+    if (hooks.override.has(index)) return [hooks.override.get(index), () => {}]
     return [hooks.force.has(index) ? true : value, () => {}]
   },
   useEffect() {},
@@ -273,9 +274,10 @@ function collect(tree) {
   return { texts, elements }
 }
 
-function renderComponent(component, props, force = []) {
+function renderComponent(component, props, force = [], override = new Map()) {
   hooks.index = 0
   hooks.force = new Set(force)
+  hooks.override = override
   return component(props)
 }
 
@@ -318,6 +320,48 @@ storage.clear()
 
 check('the console renders the housekeeping button', consoleRead.elements.some((node) => node.props.className === 'spc-more-button'))
 check('the housekeeping menu stays closed by default', consoleRead.elements.every((node) => node.props.className !== 'spc-more-menu'))
+
+/* ------------------------------------------------------------- table roles */
+
+const tableNode = consoleRead.elements.find((node) => node.props.role === 'table')
+check('the rows sit in a table container', tableNode !== undefined)
+check('the table counts its rows and columns', tableNode.props['aria-rowcount'] === 3 && tableNode.props['aria-colcount'] === 6, JSON.stringify({ rows: tableNode.props['aria-rowcount'], cols: tableNode.props['aria-colcount'] }))
+const headers = consoleRead.elements.filter((node) => node.props.role === 'columnheader')
+check('every column has a header cell', headers.length === 6, String(headers.length))
+const cells = consoleRead.elements.filter((node) => node.props.role === 'cell')
+check('every rendered row carries its cells', cells.length === 12, String(cells.length))
+check(
+  'rows are numbered after the header',
+  consoleRead.elements.filter((node) => node.props.role === 'row' && node.props['aria-rowindex'] !== undefined)
+    .map((node) => node.props['aria-rowindex']).join(',') === '1,2,3',
+)
+
+/* ------------------------------------------------------------ bulk bar red */
+
+const bulkProps = {
+  ...populatedProps,
+  useSessions: (selector) => selector({
+    ...list,
+    ids: ['session-a'],
+    byId: { 'session-a': list.byId['session-a'] },
+  }),
+}
+let bulkIndex = -1
+for (let index = 0; index < 24 && bulkIndex < 0; index += 1) {
+  try {
+    const probe = collect(renderComponent(consoleEntry.component, bulkProps, [], new Map([[index, new Set(['session-a'])]])))
+    if (probe.texts.includes('console.bulkPurge')) bulkIndex = index
+  } catch {
+    // Overriding an unrelated state can break the render; that slot is not the selection.
+  }
+}
+if (bulkIndex >= 0) {
+  const bulkRead = collect(renderComponent(consoleEntry.component, bulkProps, [], new Map([[bulkIndex, new Set(['session-a'])]])))
+  const bulkButton = bulkRead.elements.find((node) => node.type === 'button' && node.props.className === 'sp-button sp-button-sm sp-danger sp-danger-solid')
+  check('the bulk delete uses the same filled red treatment as the dialogs', bulkButton !== undefined)
+} else {
+  check('the bulk delete uses the same filled red treatment as the dialogs', false, 'no state slot opened the bulk bar')
+}
 
 // Find the state that opens the menu by trying each hook slot, then render it open.
 let menuIndex = -1
@@ -482,6 +526,7 @@ check('the overlay injects the console api', typeof overlayFace.consoleApi === '
   check('purgeMany reports each Session', progress.length === 2 && progress[0].index === 1 && progress[1].index === 2)
   check('purgeMany collects the failing Session', result.failures.length === 1 && result.failures[0].sessionId === 'session-b')
   check('purgeMany surfaces the Host message', /disk is busy/.test(result.failures[0].message), result.failures[0].message)
+  check('purgeMany records that the failed row was left archived', result.failures[0].archived === true, JSON.stringify(result.failures[0]))
   check('purgeMany drops the deleted row locally', removals === 1, String(removals))
   check('purgeMany refreshes the shared list once', refreshes === 1, String(refreshes))
   check('purgeMany posted JSON bodies', calls.at(-1).init.method === 'POST' && calls.at(-1).init.body === '{"sessionId":"session-b"}')

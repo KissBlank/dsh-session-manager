@@ -38,21 +38,25 @@
 **3. 控制台右上角 `⋯` 的清理菜单**
 
 - **清理无主缓存**：删掉「对应的会话已经不存在」的投影缓存记录，并告诉你清理了几项、释放了多少空间；
-- **清理空工作区目录**：删掉已经不包含任何会话的空工作区目录。
+- **清理空工作区目录**：删掉已经不包含任何会话的空工作区目录；
+- **清理陈旧备份**：宿主写坏的存储备份（`workspace.json.bak-*`）里如果还留着已经删掉的会话 id，把它抹掉——文件保留，只去掉失效的 id。
 
-两者都不会碰活着的会话：前者逐条比对仍在磁盘和内存里的会话，后者只在目录确实为空时才删。删除单个会话时不会顺带做这两件事——它们由你手动触发。
+三者都不会碰活着的会话：缓存清扫逐条比对仍在磁盘和内存里的会话，目录清扫只在目录确实为空时才删，备份清扫只删「宿主已经不认识的 id」。删除单个会话时不会顺带做这三件事——它们由你手动触发。
 
 ### 一次删除会删掉什么
 
 1. **停止活动**：中断该会话正在跑的轮次、结束它的后台任务，等它真正静下来（最多 3 秒）；
 2. **从所有窗口移除**：会话即时从每个窗口的列表里消失；
 3. **清掉归属与标记**：从各工作区的会话列表中摘除，并清除它的归档、置顶记录；
-4. **删除日志目录**：`<DSH_HOME>/sessions/<工作区>/<会话 id>/`，即这段会话的完整记录；
-5. **删除投影缓存**：该会话在 `storages/session_projcache` 下的缓存文件。
+4. **连带子会话**：递归找出它的所有子代理会话（含多级），一并按同样步骤处理——这些子会话的日志同样落在磁盘上，只删父会话会留下读不到的残骸；
+5. **删除日志目录**：`<DSH_HOME>/sessions/<工作区>/<会话 id>/`，父会话与每个子会话各一份；
+6. **删除投影缓存**：该会话及其子会话在 `storages/session_projcache` 下的缓存文件。
 
-**不会删**：工作区里的代码与文件、其他会话、子会话、跨会话共享的附件库、任何设置与凭据。
+删除前会先让宿主把写缓冲落盘并释放文件句柄，避免 Windows 上「文件仍被占用」导致删一半；真遇到删不掉的目录，接口会把它列在 `leftovers` 里而不是假装成功。
 
-**没有回收站**——删了就是删了。宿主自己保留的 `workspace.json.bak-*` 备份里仍可能提到这个 id，磁盘未分配空间与外部备份不在插件控制范围内。
+**不会删**：工作区里的代码与文件、其他会话、跨会话共享的附件库、任何设置与凭据。
+
+**没有回收站**——删了就是删了。磁盘未分配空间与你自己做的外部备份不在插件控制范围内；宿主自己保留的 `workspace.json.bak-*` 备份里的残留 id，可以用上面「清理陈旧备份」抹掉。
 
 ### 防误杀
 
@@ -73,6 +77,10 @@
 
 装好（或换过包名）之后**重启 DSH 桌面端**，刷新页面不够——新装的插件要等宿主重新启动才会被加载。之后日常修改本仓库代码时，只改界面刷新页面即可，改到宿主侧逻辑则仍需重启。
 
+### 兼容说明
+
+删除要动的是宿主自己的数据，所以本插件用到了几个宿主内部的接口：`sessions.store` 里每个条目的 `detach()`、`sessionProjectionCache.table` 的 `keys()`/`delete()`、`workspaceRegistry` 实体的 `detachSession()`/`unarchiveSession()`/`unpinSession()`、`sessionPersistence.root` 与 `flush()`、以及 `sessionQuery.listSessions()`。这些都按 `dsh 0.2.1-rc.5` 实测行为实现，宿主升级后如果内部形状变了，插件可能静默降级（例如缓存清扫返回 `projection-cache-unavailable`）。删目录这一步始终只依赖文件系统，不受影响。
+
 ### 许可
 
 个人与组织内部使用免费：可以安装、使用、为了自用改源码。**未经作者事先书面许可，不得再分发本插件、也不得发布修改版或 fork**（为提交 PR 而建的 fork 可以，但不能单独对外发布），不得用于付费产品/服务，不得删除署名与版权声明。商业使用或二次发布请先联系作者。完整条款见 [LICENSE](LICENSE)。
@@ -85,13 +93,15 @@
 
 - **Session menu → “Delete permanently…”**: destroys one Session from its row menu, behind a confirmation dialog.
 - **Sessions console in the sidebar icon rail**: tabs with live counts (All / Active / Archived), archived rows dimmed and badged, debounced search, sorting by last activity or creation time, a virtualized list, per-row hover actions (unarchive / delete), and a sticky bulk bar with “Select all results”.
-- **`⋯` menu in the console**: clear projection-cache records whose Session is gone, and remove empty `sessions/<project>/` folders. Neither can touch a live Session — ids are compared against the Sessions still on disk and in memory, and a folder is removed only after an empty listing.
+- **`⋯` menu in the console**: clear projection-cache records whose Session is gone, remove empty `sessions/<project>/` folders, and scrub dead Session ids out of stale `workspace.json.bak-*` backups. None of the three can touch a live Session — ids are compared against the Sessions still on disk and in memory, a folder is removed only after an empty listing, and a backup keeps every id the Host still knows.
 
 ### What a deletion touches
 
-It stops the Session (its running turn and backend jobs, up to 3 s of settling), drops it from every window's list immediately, detaches it from each Workspace and clears its archive/pin records, removes its log directory under `<DSH_HOME>/sessions/<project>/<id>/`, and deletes its projection-cache file.
+It stops the Session (its running turn and backend jobs, up to 3 s of settling), drops it from every window's list immediately, detaches it from each Workspace and clears its archive/pin records, follows its sub-agent Sessions to any depth and deletes those too, removes every log directory under `<DSH_HOME>/sessions/<project>/<id>/`, and deletes the projection-cache records of the whole family.
 
-Workspace files, other Sessions, sub-Sessions, the shared attachment store, settings and credentials are **not** touched. There is no trash: deletion is final, and Host-owned `workspace.json.bak-*` backups may still mention the id.
+The Host is flushed before anything is unlinked, so Windows does not fail on a file still held open; a directory that could not be removed is reported back in `leftovers` instead of being counted as deleted.
+
+Workspace files, other Sessions, the shared attachment store, settings and credentials are **not** touched. There is no trash: deletion is final, and any stale ids left in Host-owned `workspace.json.bak-*` backups can be scrubbed from the same `⋯` menu.
 
 ### Guards
 
@@ -99,7 +109,11 @@ If any selected Session is running, the dialog says how many, and its red confir
 
 ### Install
 
-Install through the plugin manager with any of these specs: `@kissblank/dsh-session-manager` (pin with `@1.0.1`), `github:KissBlank/dsh-session-manager` (pin with `#v1.0.1`), or a local absolute path. Then **restart the DSH desktop app** — a page reload is not enough, because the Host decides which plugins the browser loads when it starts. Afterwards, while working on this repository, UI changes come alive on a page reload and Host-side changes need a restart.
+Install through the plugin manager with any of these specs: `@kissblank/dsh-session-manager` (pin with `@1.0.2`), `github:KissBlank/dsh-session-manager` (pin with `#v1.0.2`), or a local absolute path. Then **restart the DSH desktop app** — a page reload is not enough, because the Host decides which plugins the browser loads when it starts. Afterwards, while working on this repository, UI changes come alive on a page reload and Host-side changes need a restart.
+
+### Compatibility
+
+Deleting touches the Host's own data, so this plugin reads a few Host internals: `detach()` on each `sessions.store` entry, `keys()`/`delete()` on `sessionProjectionCache.table`, `detachSession()`/`unarchiveSession()`/`unpinSession()` on a `workspaceRegistry` entity, `sessionPersistence.root` and `flush()`, and `sessionQuery.listSessions()`. All of it is implemented against `dsh 0.2.1-rc.5` as measured; if a later Host changes those shapes the plugin degrades instead of crashing (a cache sweep reports `projection-cache-unavailable`). Removing directories only relies on the filesystem and is unaffected.
 
 ### License
 

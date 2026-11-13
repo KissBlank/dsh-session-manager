@@ -130,8 +130,9 @@ npm deprecate '@kissblank/dsh-session-manager@<旧版本>' '<为什么要升级>
 - [ ] `CHANGELOG.md` 已写本次改动
 - [ ] `package.json` 的 `version` 已提升，且与 tag 一致
 - [ ] 许可证相关没被动坏：`package.json` 的 `license` 仍是 `SEE LICENSE IN LICENSE`，`LICENSE` 仍在发包文件里，README 的许可说明与 `LICENSE` 一致（自定义「保留所有权利」条款，**不要改回 MIT**）
-- [ ] `node test/host-smoke.mjs` 通过（当前 43 项）
-- [ ] `node test/client-smoke.cjs` 通过（当前 98 项）
+- [ ] `node test/host-smoke.mjs` 通过（当前 54 项）
+- [ ] `node test/client-smoke.cjs` 通过（当前 105 项）
 - [ ] `npm pack --dry-run` 的文件清单符合预期（`lib/`、`locale/`、`assets/`、`cordis.patch.yml`、`LICENSE`、`README.md`）
+- [ ] README 里没有出现测试/发版类内容（CI 的 `Keep the published README user-facing` 会拦）
 - [ ] tag 推送后 Actions 绿灯，registry 的 `dist-tags.latest` 指向新版本
 - [ ] 用包名实际装一次（插件管理器填 `@kissblank/dsh-session-manager@X.Y.Z`），重启 DSH，确认侧栏「会话管理」在
