@@ -152,6 +152,8 @@ let flushed = 0
 services.set('sessionPersistence', {
   root,
   async flush() { flushed += 1 },
+  // The raw persistence listing: always answers, even when the merged view cannot.
+  async list() { return headers.map((header) => ({ header })) },
 })
 
 // The live Session registry: detaching an entry removes it from the store, which
@@ -280,15 +282,27 @@ check('a traversal-shaped id is refused', result.response.status === 400 && resu
 
 /* ----------------------------------------------------------------- purge */
 
+// A child that somehow got archived and a grandchild that got pinned: deleting the
+// ancestor must clear those too, or the ids would be invisible to both the list
+// and the sweep that follows.
+archivedIds.push('session-manager-child')
+pinnedIds.push('session-manager-grandchild')
+
 result = await call(purge, makeRequest({ body: JSON.stringify({ sessionId: 'session-manager-test' }) }))
 check('the purge answers 200', result.response.status === 200 && result.payload.ok === true, JSON.stringify(result.payload))
 check('the purge stops activity first', registryCalls[0] === 'stop:session-manager-test', JSON.stringify(registryCalls))
 check('the purge stops activity for the descendants too', registryCalls.includes('stop:session-manager-child') && registryCalls.includes('stop:session-manager-grandchild'))
 check('the purge drops only the workspaces that listed the Session', detached.length === 2 && result.payload.workspaces === 1, JSON.stringify({ detached, workspaces: result.payload.workspaces }))
 check('the purge clears archive and pin ids', registryCalls.includes('unarchive:session-manager-test') && registryCalls.includes('unpin:session-manager-test'))
+check(
+  'the purge clears the archive and pin sets of the whole family',
+  !archivedIds.includes('session-manager-child') && !pinnedIds.includes('session-manager-grandchild'),
+  JSON.stringify({ archivedIds, pinnedIds }),
+)
 check('the purge releases every live Session in the family', released.sort().join(',') === 'session-manager-child,session-manager-test', released.join(','))
 check('the purge flushes persistence before unlinking', flushed === 1, String(flushed))
 check('the purge counts the descendants it followed', result.payload.descendants === 2, String(result.payload.descendants))
+check('a resolved family is not reported as unresolved', result.payload.descendantsUnresolved === false, JSON.stringify(result.payload))
 check(
   'the purge deletes the projection cache of the whole family',
   cacheDeletes.slice().sort().join(',') === 'session-manager-child,session-manager-grandchild,session-manager-test',
@@ -348,6 +362,44 @@ check('backup housekeeping kept the live Session id', scrubbed.includes('session
 const untouched = await readFile(liveBackup, 'utf8')
 check('backup housekeeping leaves a clean backup alone', untouched.includes('session-keep-test'), untouched)
 
+// A registry that is still starting cannot answer its id sets. The file sweep is
+// the actual job and must still run: failing over a set nobody can read yet would
+// report "nothing to clean up" for a Host that has work to do.
+const realRegistry = services.get('workspaceRegistry')
+services.set('workspaceRegistry', {
+  list: realRegistry.list,
+  get archivedSessionIds() { throw new Error('workspace registry is not started yet') },
+  get pinnedSessionIds() { throw new Error('workspace registry is not started yet') },
+  async stopSessionActivity() {},
+  async unarchiveSession() {},
+  async unpinSession() {},
+})
+result = await call(backupUpkeep, makeRequest({ body: '{}' }))
+check(
+  'backup housekeeping survives an unreadable registry',
+  result.response.status === 200 && result.payload.ok === true && result.payload.staleIds === 0,
+  JSON.stringify(result.payload),
+)
+services.set('workspaceRegistry', realRegistry)
+
+// The same for the purge: a registry that cannot list workspaces must not stop the
+// files from being removed.
+services.set('workspaceRegistry', {
+  list() { throw new Error('workspace registry is not started yet') },
+  get archivedSessionIds() { return [] },
+  get pinnedSessionIds() { return [] },
+  async stopSessionActivity() {},
+  async unarchiveSession() {},
+  async unpinSession() {},
+})
+result = await call(purge, makeRequest({ body: JSON.stringify({ sessionId: 'session-keep-test' }) }))
+check(
+  'a purge survives a registry that cannot list',
+  result.response.status === 200 && result.payload.ok === true && result.payload.workspaces === 0,
+  JSON.stringify(result.payload),
+)
+services.set('workspaceRegistry', realRegistry)
+
 // A Host without a projection-cache table cannot sweep the cache: it says so.
 services.delete('sessionProjectionCache')
 result = await call(cacheUpkeep, makeRequest({ body: '{}' }))
@@ -366,7 +418,11 @@ result = await call(backupUpkeep, makeRequest({ body: '{}' }))
 check('backup housekeeping reports unreadable storages', result.response.status === 200 && result.payload.skipped === 'storages-unreadable', JSON.stringify(result.payload))
 
 // A real fault is a 500, not a crash.
-services.set('sessionPersistence', { root, async flush() {} })
+services.set('sessionPersistence', {
+  root,
+  async flush() {},
+  async list() { return headers.map((header) => ({ header })) },
+})
 services.set('sessionProjectionCache', { table: cacheTable })
 const realGet = ctx.get
 ctx.get = (key) => {
@@ -377,14 +433,33 @@ result = await call(cacheUpkeep, makeRequest({ body: '{}' }))
 check('a housekeeping failure is a 500', result.response.status === 500 && result.payload.error === 'upkeep-failed', JSON.stringify(result.payload))
 ctx.get = realGet
 
-// An inventory failure is reported, not thrown.
+// A merged-view failure falls back to the raw persistence listing instead of
+// losing the console.
 services.set('sessionQuery', { async listSessions() { throw new Error('index offline') } })
 result = await call(inventory, makeRequest({ method: 'GET' }))
-check('an inventory failure is reported', result.response.status === 500 && result.payload.error === 'inventory-failed')
+check(
+  'an inventory falls back to the persistence listing',
+  result.response.status === 200 && Array.isArray(result.payload.sessions) && result.payload.sessions.length === 5,
+  JSON.stringify(result.payload),
+)
 
-// A purge whose descendant lookup fails still deletes the Session itself.
+// With both sources down the failure is reported, not thrown.
+services.set('sessionPersistence', { root, async flush() {}, async list() { throw new Error('logs offline') } })
+result = await call(inventory, makeRequest({ method: 'GET' }))
+check(
+  'an inventory failure is reported',
+  result.response.status === 500 && result.payload.error === 'inventory-failed',
+  JSON.stringify(result.payload),
+)
+
+// A purge whose descendant lookup fails still deletes the Session itself, and
+// says that the family is incomplete.
 result = await call(purge, makeRequest({ body: JSON.stringify({ sessionId: 'session-keep-test' }) }))
-check('a broken descendant lookup still purges the target', result.response.status === 200 && result.payload.descendants === 0 && !existsSync(kept), JSON.stringify(result.payload))
+check(
+  'a broken descendant lookup still purges the target',
+  result.response.status === 200 && result.payload.descendants === 0 && result.payload.descendantsUnresolved === true && !existsSync(kept),
+  JSON.stringify(result.payload),
+)
 
 await rm(base, { recursive: true, force: true })
 

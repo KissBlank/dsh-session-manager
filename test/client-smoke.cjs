@@ -493,6 +493,14 @@ overlayStore.value = { ...overlayStore.value, phase: 'done', message: '' }
 read = collect(renderComponent(single.component, overlayProps))
 check('the done state turns into a toast', read.texts.join(' ').includes('toast.done'))
 
+overlayStore.value = { ...overlayStore.value, phase: 'done', message: '', leftovers: 2 }
+read = collect(renderComponent(single.component, overlayProps))
+check('a leftover log is not toasted as a clean deletion', read.texts.join(' ').includes('toast.incomplete'))
+
+overlayStore.value = { ...overlayStore.value, phase: 'done', message: '', leftovers: 0, descendantsUnresolved: true }
+read = collect(renderComponent(single.component, overlayProps))
+check('an unresolved family is not toasted as a clean deletion', read.texts.join(' ').includes('toast.incomplete'))
+
 check('the overlay injects the console api', typeof overlayFace.consoleApi === 'object')
 
 /* ------------------------------------------------------------------ host */
@@ -518,18 +526,20 @@ check('the overlay injects the console api', typeof overlayFace.consoleApi === '
   let step = 0
   fetchImpl = async () => {
     step += 1
-    if (step === 1) return { ok: true, status: 200, json: async () => ({ ok: true }) }
+    if (step === 1) return { ok: true, status: 200, json: async () => ({ ok: true, leftovers: [] }) }
+    if (step === 2) return { ok: true, status: 200, json: async () => ({ ok: true, leftovers: ['C:/x/session-c'] }) }
     return { ok: false, status: 500, json: async () => ({ ok: false, message: 'disk is busy' }) }
   }
   const progress = []
-  const result = await consoleApi.purgeMany(['session-a', 'session-b'], (info) => progress.push(info))
-  check('purgeMany reports each Session', progress.length === 2 && progress[0].index === 1 && progress[1].index === 2)
-  check('purgeMany collects the failing Session', result.failures.length === 1 && result.failures[0].sessionId === 'session-b')
+  const result = await consoleApi.purgeMany(['session-a', 'session-b', 'session-c'], (info) => progress.push(info))
+  check('purgeMany reports each Session', progress.length === 3 && progress[0].index === 1 && progress[2].index === 3)
+  check('purgeMany collects the failing Session', result.failures.length === 1 && result.failures[0].sessionId === 'session-c')
   check('purgeMany surfaces the Host message', /disk is busy/.test(result.failures[0].message), result.failures[0].message)
   check('purgeMany records that the failed row was left archived', result.failures[0].archived === true, JSON.stringify(result.failures[0]))
-  check('purgeMany drops the deleted row locally', removals === 1, String(removals))
+  check('purgeMany counts the rows that left files behind', result.incomplete === 1, JSON.stringify(result))
+  check('purgeMany drops the deleted row locally', removals === 2, String(removals))
   check('purgeMany refreshes the shared list once', refreshes === 1, String(refreshes))
-  check('purgeMany posted JSON bodies', calls.at(-1).init.method === 'POST' && calls.at(-1).init.body === '{"sessionId":"session-b"}')
+  check('purgeMany posted JSON bodies', calls.at(-1).init.method === 'POST' && calls.at(-1).init.body === '{"sessionId":"session-c"}')
 
   let selected = 'unchanged'
   services.set('layout', { selectPanel: (id) => { selected = id } })
@@ -546,10 +556,18 @@ check('the overlay injects the console api', typeof overlayFace.consoleApi === '
   await consoleApi.upkeep('directories')
   check('the folder sweep hits its own route', calls.at(-1).url === '/session-manager/api/maintenance/directories', calls.at(-1).url)
 
-  fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ ok: true, kind: 'backups', removed: 1, freedBytes: 64 }) })
+  fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ ok: true, kind: 'backups', removed: 1, freedBytes: 64, staleIds: 7, scanned: 5 }) })
   const backups = await consoleApi.upkeep('backups')
   check('the backup sweep hits its own route', calls.at(-1).url === '/session-manager/api/maintenance/backups', calls.at(-1).url)
   check('the backup sweep reports its result', backups.removed === 1, JSON.stringify(backups))
+  check('the backup sweep passes the stale id count through', backups.staleIds === 7, JSON.stringify(backups))
+  check('the backup sweep passes the scanned count through', backups.scanned === 5, JSON.stringify(backups))
+
+  // A sweep that only cleared the live records reports zero rewritten files; the
+  // stale count is then the only evidence the sweep did anything.
+  fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ ok: true, kind: 'backups', removed: 0, freedBytes: 0, staleIds: 3, scanned: 4 }) })
+  const staleOnly = await consoleApi.upkeep('backups')
+  check('a stale-only sweep still reports its stale ids', staleOnly.removed === 0 && staleOnly.staleIds === 3, JSON.stringify(staleOnly))
 
   fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ ok: true, skipped: 'projection-cache-unavailable' }) })
   const skipped = await consoleApi.upkeep('cache')

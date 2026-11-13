@@ -39,7 +39,7 @@
 
 - **清理无主缓存**：删掉「对应的会话已经不存在」的投影缓存记录，并告诉你清理了几项、释放了多少空间；
 - **清理空工作区目录**：删掉已经不包含任何会话的空工作区目录；
-- **清理陈旧备份**：宿主写坏的存储备份（`workspace.json.bak-*`）里如果还留着已经删掉的会话 id，把它抹掉——文件保留，只去掉失效的 id；同时把活动记录（`workspace.json` 的归档/置顶集合）里指向已删会话的 id 一并清掉。
+- **清理陈旧备份**：宿主写坏的存储备份（`workspace.json.bak-*`）里如果还留着已经删掉的会话 id，把它抹掉——文件保留，只去掉失效的 id；同时把活动记录（`workspace.json` 的归档/置顶集合）里指向已删会话的 id 一并清掉。两项分开计数：重写了几份备份、从活动记录里清掉几个 id，只做了其中一项时也只报那一项。
 
 三者都不会碰活着的会话：缓存清扫逐条比对仍在磁盘和内存里的会话，目录清扫只在目录确实为空时才删，备份清扫只删「宿主已经不认识的 id」。删除单个会话时不会顺带做这三件事——它们由你手动触发。
 
@@ -52,7 +52,7 @@
 5. **删除日志目录**：`<DSH_HOME>/sessions/<工作区>/<会话 id>/`，父会话与每个子会话各一份；
 6. **删除投影缓存**：该会话及其子会话在 `storages/session_projcache` 下的缓存文件。
 
-删除前会先让宿主把写缓冲落盘并释放文件句柄，避免 Windows 上「文件仍被占用」导致删一半；真遇到删不掉的目录，接口会把它列在 `leftovers` 里而不是假装成功。
+删除前会先让宿主把写缓冲落盘并释放文件句柄，避免 Windows 上「文件仍被占用」导致删一半；真遇到删不掉的目录，接口会把它列在 `leftovers` 里而不是假装成功。子会话关系读不到时（宿主的两份会话清单互相矛盾），会回落到直接读日志目录；两份都读不到才标记 `descendantsUnresolved`，控制台会把这批算作「有文件未删净」而不是干净删除。
 
 **不会删**：工作区里的代码与文件、其他会话、跨会话共享的附件库、任何设置与凭据。
 
@@ -69,8 +69,8 @@
 
 在插件管理器的安装入口填下面任一写法：
 
-- npm 包名：`@kissblank/dsh-session-manager`（可锁版本：`@kissblank/dsh-session-manager@1.0.3`）
-- GitHub：`github:KissBlank/dsh-session-manager`（可锁 tag：`github:KissBlank/dsh-session-manager#v1.0.3`）
+- npm 包名：`@kissblank/dsh-session-manager`（可锁版本：`@kissblank/dsh-session-manager@1.0.4`）
+- GitHub：`github:KissBlank/dsh-session-manager`（可锁 tag：`github:KissBlank/dsh-session-manager#v1.0.4`）
 - 本地：填本仓库的绝对路径
 
 1.0.0 起仓库名与 npm 包名统一为 `@kissblank/dsh-session-manager`，版本号也从 1.0.0 重新开始（更早的 0.x 版本与试验用的包名均已下线）。
@@ -93,13 +93,13 @@
 
 - **Session menu → “Delete permanently…”**: destroys one Session from its row menu, behind a confirmation dialog.
 - **Sessions console in the sidebar icon rail**: tabs with live counts (All / Active / Archived), archived rows dimmed and badged, debounced search, sorting by last activity or creation time, a virtualized list, per-row hover actions (unarchive / delete), and a sticky bulk bar with “Select all results”.
-- **`⋯` menu in the console**: clear projection-cache records whose Session is gone, remove empty `sessions/<project>/` folders, and scrub dead Session ids out of stale `workspace.json.bak-*` backups and out of the live archive/pin sets. None of the three can touch a live Session — ids are compared against the Sessions still on disk and in memory, a folder is removed only after an empty listing, and every id the Host still knows is kept.
+- **`⋯` menu in the console**: clear projection-cache records whose Session is gone, remove empty `sessions/<project>/` folders, and scrub dead Session ids out of stale `workspace.json.bak-*` backups and out of the live archive/pin sets. None of the three can touch a live Session — ids are compared against the Sessions still on disk and in memory, a folder is removed only after an empty listing, and every id the Host still knows is kept. The backup sweep counts the two halves separately (files rewritten, ids dropped from the live records) and reports only the half that did work.
 
 ### What a deletion touches
 
 It stops the Session (its running turn and backend jobs, up to 3 s of settling), drops it from every window's list immediately, detaches it from each Workspace and clears its archive/pin records, follows its sub-agent Sessions to any depth and deletes those too, removes every log directory under `<DSH_HOME>/sessions/<project>/<id>/`, and deletes the projection-cache records of the whole family.
 
-The Host is flushed before anything is unlinked, so Windows does not fail on a file still held open; a directory that could not be removed is reported back in `leftovers` instead of being counted as deleted.
+The Host is flushed before anything is unlinked, so Windows does not fail on a file still held open; a directory that could not be removed is reported back in `leftovers` instead of being counted as deleted. When the child lookup cannot answer — the Host's live and persisted corpora disagree about one Session — the raw persistence listing is used instead; only if both fail is the family marked `descendantsUnresolved`, and the console counts that batch as leaving files behind rather than reporting a clean sweep.
 
 Workspace files, other Sessions, the shared attachment store, settings and credentials are **not** touched. There is no trash: deletion is final, and stale ids left in Host-owned `workspace.json.bak-*` backups or in the live archive/pin sets can be scrubbed from the same `⋯` menu.
 
