@@ -79,7 +79,7 @@
 
 ### 兼容说明
 
-删除要动的是宿主自己的数据，所以本插件用到了几个宿主内部的接口：`sessions.store` 里每个条目的 `detach()`、`sessionProjectionCache.table` 的 `keys()`/`delete()`、`workspaceRegistry` 实体的 `detachSession()`/`unarchiveSession()`/`unpinSession()`、`sessionPersistence.root` 与 `flush()`、以及 `sessionQuery.listSessions()`。这些都按 `dsh 0.2.1-rc.5` 实测行为实现，宿主升级后如果内部形状变了，插件可能静默降级（例如缓存清扫返回 `projection-cache-unavailable`）。删目录这一步始终只依赖文件系统，不受影响。
+删除要动的是宿主自己的数据，所以本插件用到了几个宿主提供的接口：`sessions.store` 里每个条目的 `detach()`、`sessionProjectionCache.table` 的 `keys()`/`delete()`、`workspaceRegistry` 实体的 `detachSession()`/`unarchiveSession()`/`unpinSession()`、`sessionPersistence.root` 与 `flush()`、以及 `sessionQuery.listSessions()`。这些都按 `dsh 0.2.1-rc.5` 实测行为实现，宿主升级后如果这些接口的形状变了，插件可能静默降级（例如缓存清扫返回 `projection-cache-unavailable`）。删目录这一步始终只依赖文件系统，不受影响。
 
 ### 许可
 
@@ -113,7 +113,7 @@ Install through the plugin manager with any of these specs: `@kissblank/dsh-sess
 
 ### Compatibility
 
-Deleting touches the Host's own data, so this plugin reads a few Host internals: `detach()` on each `sessions.store` entry, `keys()`/`delete()` on `sessionProjectionCache.table`, `detachSession()`/`unarchiveSession()`/`unpinSession()` on a `workspaceRegistry` entity, `sessionPersistence.root` and `flush()`, and `sessionQuery.listSessions()`. All of it is implemented against `dsh 0.2.1-rc.5` as measured; if a later Host changes those shapes the plugin degrades instead of crashing (a cache sweep reports `projection-cache-unavailable`). Removing directories only relies on the filesystem and is unaffected.
+Deleting touches the Host's own data, so this plugin reads a few interfaces the Host exposes: `detach()` on each `sessions.store` entry, `keys()`/`delete()` on `sessionProjectionCache.table`, `detachSession()`/`unarchiveSession()`/`unpinSession()` on a `workspaceRegistry` entity, `sessionPersistence.root` and `flush()`, and `sessionQuery.listSessions()`. All of it is implemented against `dsh 0.2.1-rc.5` as measured; if a later Host changes those shapes the plugin degrades instead of crashing (a cache sweep reports `projection-cache-unavailable`). Removing directories only relies on the filesystem and is unaffected.
 
 ### License
 
