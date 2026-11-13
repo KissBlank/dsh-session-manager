@@ -389,13 +389,13 @@ let upkeepClick = null
 if (menuIndex >= 0) {
   const upkeepRead = collect(renderComponent(consoleEntry.component, upkeepProps, [menuIndex]))
   check('the housekeeping menu opens', upkeepRead.elements.some((node) => node.props.className === 'spc-more-menu'))
-  check('the housekeeping menu lists both sweeps', upkeepRead.texts.includes('console.more.cache') && upkeepRead.texts.includes('console.more.directories'))
+  check('the housekeeping menu lists every sweep', upkeepRead.texts.includes('console.more.cache') && upkeepRead.texts.includes('console.more.directories') && upkeepRead.texts.includes('console.more.backups'))
   const items = upkeepRead.elements.filter((node) => node.type === 'button' && node.props.role === 'menuitem')
-  check('the housekeeping menu renders menuitem rows', items.length === 2, String(items.length))
-  if (items.length === 2) upkeepClick = items[0].props.onClick
+  check('the housekeeping menu renders menuitem rows', items.length === 3, String(items.length))
+  if (items.length === 3) upkeepClick = items[0].props.onClick
 } else {
   check('the housekeeping menu opens', false, 'no state slot opened it')
-  check('the housekeeping menu lists both sweeps', false)
+  check('the housekeeping menu lists every sweep', false)
   check('the housekeeping menu renders menuitem rows', false)
 }
 
@@ -545,6 +545,11 @@ check('the overlay injects the console api', typeof overlayFace.consoleApi === '
   fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ ok: true, kind: 'directories', removed: 2 }) })
   await consoleApi.upkeep('directories')
   check('the folder sweep hits its own route', calls.at(-1).url === '/session-manager/api/maintenance/directories', calls.at(-1).url)
+
+  fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ ok: true, kind: 'backups', removed: 1, freedBytes: 64 }) })
+  const backups = await consoleApi.upkeep('backups')
+  check('the backup sweep hits its own route', calls.at(-1).url === '/session-manager/api/maintenance/backups', calls.at(-1).url)
+  check('the backup sweep reports its result', backups.removed === 1, JSON.stringify(backups))
 
   fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ ok: true, skipped: 'projection-cache-unavailable' }) })
   const skipped = await consoleApi.upkeep('cache')

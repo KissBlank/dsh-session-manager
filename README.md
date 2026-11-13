@@ -39,7 +39,7 @@
 
 - **清理无主缓存**：删掉「对应的会话已经不存在」的投影缓存记录，并告诉你清理了几项、释放了多少空间；
 - **清理空工作区目录**：删掉已经不包含任何会话的空工作区目录；
-- **清理陈旧备份**：宿主写坏的存储备份（`workspace.json.bak-*`）里如果还留着已经删掉的会话 id，把它抹掉——文件保留，只去掉失效的 id。
+- **清理陈旧备份**：宿主写坏的存储备份（`workspace.json.bak-*`）里如果还留着已经删掉的会话 id，把它抹掉——文件保留，只去掉失效的 id；同时把活动记录（`workspace.json` 的归档/置顶集合）里指向已删会话的 id 一并清掉。
 
 三者都不会碰活着的会话：缓存清扫逐条比对仍在磁盘和内存里的会话，目录清扫只在目录确实为空时才删，备份清扫只删「宿主已经不认识的 id」。删除单个会话时不会顺带做这三件事——它们由你手动触发。
 
@@ -69,8 +69,8 @@
 
 在插件管理器的安装入口填下面任一写法：
 
-- npm 包名：`@kissblank/dsh-session-manager`（可锁版本：`@kissblank/dsh-session-manager@1.0.2`）
-- GitHub：`github:KissBlank/dsh-session-manager`（可锁 tag：`github:KissBlank/dsh-session-manager#v1.0.2`）
+- npm 包名：`@kissblank/dsh-session-manager`（可锁版本：`@kissblank/dsh-session-manager@1.0.3`）
+- GitHub：`github:KissBlank/dsh-session-manager`（可锁 tag：`github:KissBlank/dsh-session-manager#v1.0.3`）
 - 本地：填本仓库的绝对路径
 
 1.0.0 起仓库名与 npm 包名统一为 `@kissblank/dsh-session-manager`，版本号也从 1.0.0 重新开始（更早的 0.x 版本与试验用的包名均已下线）。
@@ -93,7 +93,7 @@
 
 - **Session menu → “Delete permanently…”**: destroys one Session from its row menu, behind a confirmation dialog.
 - **Sessions console in the sidebar icon rail**: tabs with live counts (All / Active / Archived), archived rows dimmed and badged, debounced search, sorting by last activity or creation time, a virtualized list, per-row hover actions (unarchive / delete), and a sticky bulk bar with “Select all results”.
-- **`⋯` menu in the console**: clear projection-cache records whose Session is gone, remove empty `sessions/<project>/` folders, and scrub dead Session ids out of stale `workspace.json.bak-*` backups. None of the three can touch a live Session — ids are compared against the Sessions still on disk and in memory, a folder is removed only after an empty listing, and a backup keeps every id the Host still knows.
+- **`⋯` menu in the console**: clear projection-cache records whose Session is gone, remove empty `sessions/<project>/` folders, and scrub dead Session ids out of stale `workspace.json.bak-*` backups and out of the live archive/pin sets. None of the three can touch a live Session — ids are compared against the Sessions still on disk and in memory, a folder is removed only after an empty listing, and every id the Host still knows is kept.
 
 ### What a deletion touches
 
@@ -101,7 +101,7 @@ It stops the Session (its running turn and backend jobs, up to 3 s of settling),
 
 The Host is flushed before anything is unlinked, so Windows does not fail on a file still held open; a directory that could not be removed is reported back in `leftovers` instead of being counted as deleted.
 
-Workspace files, other Sessions, the shared attachment store, settings and credentials are **not** touched. There is no trash: deletion is final, and any stale ids left in Host-owned `workspace.json.bak-*` backups can be scrubbed from the same `⋯` menu.
+Workspace files, other Sessions, the shared attachment store, settings and credentials are **not** touched. There is no trash: deletion is final, and stale ids left in Host-owned `workspace.json.bak-*` backups or in the live archive/pin sets can be scrubbed from the same `⋯` menu.
 
 ### Guards
 
@@ -109,7 +109,7 @@ If any selected Session is running, the dialog says how many, and its red confir
 
 ### Install
 
-Install through the plugin manager with any of these specs: `@kissblank/dsh-session-manager` (pin with `@1.0.2`), `github:KissBlank/dsh-session-manager` (pin with `#v1.0.2`), or a local absolute path. Then **restart the DSH desktop app** — a page reload is not enough, because the Host decides which plugins the browser loads when it starts. Afterwards, while working on this repository, UI changes come alive on a page reload and Host-side changes need a restart.
+Install through the plugin manager with any of these specs: `@kissblank/dsh-session-manager` (pin with `@1.0.3`), `github:KissBlank/dsh-session-manager` (pin with `#v1.0.3`), or a local absolute path. Then **restart the DSH desktop app** — a page reload is not enough, because the Host decides which plugins the browser loads when it starts. Afterwards, while working on this repository, UI changes come alive on a page reload and Host-side changes need a restart.
 
 ### Compatibility
 

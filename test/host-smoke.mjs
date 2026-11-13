@@ -125,11 +125,27 @@ const workspaces = [
   { sessionIds: ['session-manager-test', 'session-keep-test'], detachSession: async (id) => { detached.push(`first:${id}`) } },
   { sessionIds: ['session-keep-test'], detachSession: async (id) => { detached.push(`second:${id}`) } },
 ]
+// The registry's global archive and pin sets: the sweep must drop ids the Host no
+// longer knows and leave live ones alone.
+const archivedIds = ['session-keep-test', 'session-gone-forever']
+const pinnedIds = ['session-gone-forever']
 services.set('workspaceRegistry', {
   list: () => workspaces,
+  get archivedSessionIds() { return archivedIds },
+  get pinnedSessionIds() { return pinnedIds },
   async stopSessionActivity(id) { registryCalls.push(`stop:${id}`) },
-  async unarchiveSession(id) { registryCalls.push(`unarchive:${id}`) },
-  async unpinSession(id) { registryCalls.push(`unpin:${id}`) },
+  async unarchiveSession(id) {
+    registryCalls.push(`unarchive:${id}`)
+    const at = archivedIds.indexOf(id)
+    if (at === -1) return
+    archivedIds.splice(at, 1)
+  },
+  async unpinSession(id) {
+    registryCalls.push(`unpin:${id}`)
+    const at = pinnedIds.indexOf(id)
+    if (at === -1) return
+    pinnedIds.splice(at, 1)
+  },
 })
 
 let flushed = 0
@@ -319,6 +335,13 @@ check('folder housekeeping kept the project folder that still holds a Session', 
 result = await call(backupUpkeep, makeRequest({ body: '{}' }))
 check('backup housekeeping answers 200', result.response.status === 200 && result.payload.ok === true, JSON.stringify(result.payload))
 check('backup housekeeping rewrites only the backup naming a dead Session', result.payload.removed === 1, JSON.stringify(result.payload))
+check('backup housekeeping counts the ids it dropped from the live registry', result.payload.staleIds === 2, JSON.stringify(result.payload))
+check(
+  'backup housekeeping empties the dead ids out of the archive set',
+  archivedIds.join(',') === 'session-keep-test',
+  archivedIds.join(','),
+)
+check('backup housekeeping empties the dead ids out of the pin set', pinnedIds.length === 0, pinnedIds.join(','))
 const scrubbed = await readFile(staleBackup, 'utf8')
 check('backup housekeeping dropped the dead Session id', !scrubbed.includes('session-gone-forever') && !scrubbed.includes('session-manager-test'), scrubbed)
 check('backup housekeeping kept the live Session id', scrubbed.includes('session-keep-test'), scrubbed)
