@@ -109,7 +109,7 @@ If any selected Session is running, the dialog says how many, and its red confir
 
 ### Install
 
-Install through the plugin manager with any of these specs: `@kissblank/dsh-session-manager` (pin with `@1.0.3`), `github:KissBlank/dsh-session-manager` (pin with `#v1.0.3`), or a local absolute path. Then **restart the DSH desktop app** — a page reload is not enough, because the Host decides which plugins the browser loads when it starts. Afterwards, while working on this repository, UI changes come alive on a page reload and Host-side changes need a restart.
+Install through the plugin manager with any of these specs: `@kissblank/dsh-session-manager` (pin with `@1.0.4`), `github:KissBlank/dsh-session-manager` (pin with `#v1.0.4`), or a local absolute path. Then **restart the DSH desktop app** — a page reload is not enough, because the Host decides which plugins the browser loads when it starts. Afterwards, while working on this repository, UI changes come alive on a page reload and Host-side changes need a restart.
 
 ### Compatibility
 
