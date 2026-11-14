@@ -349,7 +349,11 @@ check('folder housekeeping kept the project folder that still holds a Session', 
 result = await call(backupUpkeep, makeRequest({ body: '{}' }))
 check('backup housekeeping answers 200', result.response.status === 200 && result.payload.ok === true, JSON.stringify(result.payload))
 check('backup housekeeping rewrites only the backup naming a dead Session', result.payload.removed === 1, JSON.stringify(result.payload))
-check('backup housekeeping counts the ids it dropped from the live registry', result.payload.staleIds === 2, JSON.stringify(result.payload))
+check(
+  'backup housekeeping counts a dead id once even when it sits in both sets',
+  result.payload.staleIds === 1,
+  JSON.stringify(result.payload),
+)
 check(
   'backup housekeeping empties the dead ids out of the archive set',
   archivedIds.join(',') === 'session-keep-test',
@@ -416,6 +420,41 @@ await mkdir(join(base, 'orphan-home'), { recursive: true })
 services.set('sessionPersistence', { root: orphanRoot, async flush() {} })
 result = await call(backupUpkeep, makeRequest({ body: '{}' }))
 check('backup housekeeping reports unreadable storages', result.response.status === 200 && result.payload.skipped === 'storages-unreadable', JSON.stringify(result.payload))
+
+// Without the sessions root the known set would hold only the live store: every
+// log on disk would look deleted. Both sweeps have to refuse, and the registry
+// must keep its ids untouched.
+services.set('sessionPersistence', { root: undefined, async flush() {} })
+archivedIds.push('session-gone-forever')
+const archivedBeforeRootless = archivedIds.join(',')
+result = await call(backupUpkeep, makeRequest({ body: '{}' }))
+check(
+  'backup housekeeping refuses without the sessions root',
+  result.response.status === 200 && result.payload.skipped === 'sessions-root-unavailable' && result.payload.staleIds === 0,
+  JSON.stringify(result.payload),
+)
+check(
+  'backup housekeeping leaves the registry alone without the sessions root',
+  archivedIds.join(',') === archivedBeforeRootless,
+  archivedIds.join(','),
+)
+result = await call(cacheUpkeep, makeRequest({ body: '{}' }))
+check(
+  'cache housekeeping refuses without the sessions root',
+  result.response.status === 200 && result.payload.skipped === 'sessions-root-unavailable',
+  JSON.stringify(result.payload),
+)
+archivedIds.splice(archivedIds.indexOf('session-gone-forever'), 1)
+
+// An empty root must not resolve to the process working directory and start
+// deleting look-alike folders there.
+services.set('sessionPersistence', { root: '', async flush() {}, async list() { return headers.map((header) => ({ header })) } })
+result = await call(purge, makeRequest({ body: JSON.stringify({ sessionId: 'session-ghost-test' }) }))
+check(
+  'an empty sessions root does not turn into the working directory',
+  result.response.status === 200 && result.payload.directories.length === 0 && result.payload.leftovers.length === 0,
+  JSON.stringify(result.payload),
+)
 
 // A real fault is a 500, not a crash.
 services.set('sessionPersistence', {

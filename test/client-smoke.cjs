@@ -496,6 +496,11 @@ check('the done state turns into a toast', read.texts.join(' ').includes('toast.
 overlayStore.value = { ...overlayStore.value, phase: 'done', message: '', leftovers: 2 }
 read = collect(renderComponent(single.component, overlayProps))
 check('a leftover log is not toasted as a clean deletion', read.texts.join(' ').includes('toast.incomplete'))
+check(
+  'an incomplete deletion wears the warning treatment',
+  read.elements.some((node) => typeof node.props?.className === 'string' && node.props.className.includes('sp-toast-warn')),
+  'no sp-toast-warn element',
+)
 
 overlayStore.value = { ...overlayStore.value, phase: 'done', message: '', leftovers: 0, descendantsUnresolved: true }
 read = collect(renderComponent(single.component, overlayProps))

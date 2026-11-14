@@ -69,8 +69,8 @@
 
 在插件管理器的安装入口填下面任一写法：
 
-- npm 包名：`@kissblank/dsh-session-manager`（可锁版本：`@kissblank/dsh-session-manager@1.0.4`）
-- GitHub：`github:KissBlank/dsh-session-manager`（可锁 tag：`github:KissBlank/dsh-session-manager#v1.0.4`）
+- npm 包名：`@kissblank/dsh-session-manager`（可锁版本：`@kissblank/dsh-session-manager@1.0.5`）
+- GitHub：`github:KissBlank/dsh-session-manager`（可锁 tag：`github:KissBlank/dsh-session-manager#v1.0.5`）
 - 本地：填本仓库的绝对路径
 
 1.0.0 起仓库名与 npm 包名统一为 `@kissblank/dsh-session-manager`，版本号也从 1.0.0 重新开始（更早的 0.x 版本与试验用的包名均已下线）。
@@ -109,7 +109,7 @@ If any selected Session is running, the dialog says how many, and its red confir
 
 ### Install
 
-Install through the plugin manager with any of these specs: `@kissblank/dsh-session-manager` (pin with `@1.0.4`), `github:KissBlank/dsh-session-manager` (pin with `#v1.0.4`), or a local absolute path. Then **restart the DSH desktop app** — a page reload is not enough, because the Host decides which plugins the browser loads when it starts. Afterwards, while working on this repository, UI changes come alive on a page reload and Host-side changes need a restart.
+Install through the plugin manager with any of these specs: `@kissblank/dsh-session-manager` (pin with `@1.0.5`), `github:KissBlank/dsh-session-manager` (pin with `#v1.0.5`), or a local absolute path. Then **restart the DSH desktop app** — a page reload is not enough, because the Host decides which plugins the browser loads when it starts. Afterwards, while working on this repository, UI changes come alive on a page reload and Host-side changes need a restart.
 
 ### Compatibility
 
