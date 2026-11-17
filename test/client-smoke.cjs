@@ -188,7 +188,8 @@ const workspaces = {
 const statuses = new Map([['session-a', { running: true, pendingInteraction: undefined }]])
 
 const rows = test.buildRows(list, statuses, workspaces, { 'session-b': 1_700_000_000_000 })
-check('rows skip subagent children', rows.length === 2 && rows.every((row) => row.id === 'session-a' || row.id === 'session-b'))
+check('rows skip subagent children', rows.length === 3 && rows.every((row) => row.id !== 'session-c'))
+check('rows keep forked Sessions', rows.some((row) => row.id === 'session-d'))
 check('rows carry the archived flag', rows.find((row) => row.id === 'session-b').archived === true)
 check('rows carry the workspace title', rows.find((row) => row.id === 'session-a').workspace === 'demo')
 check('rows carry a running flag', rows.find((row) => row.id === 'session-a').running === true)
@@ -199,7 +200,7 @@ check('search matches the title', test.matchesQuery({ title: 'Alpha', id: 'sessi
 check('search matches the id', test.matchesQuery({ title: 'Alpha', id: 'session-a', workspace: 'demo' }, 'SESSION-A') === true)
 check('search matches the workspace', test.matchesQuery({ title: 'Alpha', id: 'session-a', workspace: 'demo' }, 'dem') === true)
 check('search rejects a miss', test.matchesQuery({ title: 'Alpha', id: 'session-a', workspace: 'demo' }, 'zzz') === false)
-check('counts split archived from active', JSON.stringify(test.countByTab(rows, '')) === JSON.stringify({ all: 2, active: 1, archived: 1 }))
+check('counts split archived from active', JSON.stringify(test.countByTab(rows, '')) === JSON.stringify({ all: 3, active: 2, archived: 1 }))
 check('counts follow the search', JSON.stringify(test.countByTab(rows, 'beta')) === JSON.stringify({ all: 1, active: 0, archived: 1 }))
 check('activity sort is newest first', test.sortRows(rows, 'activity')[0].id === 'session-a')
 check('creation sort uses the Host time', test.sortRows(rows, 'created')[0].id === 'session-b')
@@ -325,15 +326,15 @@ check('the housekeeping menu stays closed by default', consoleRead.elements.ever
 
 const tableNode = consoleRead.elements.find((node) => node.props.role === 'table')
 check('the rows sit in a table container', tableNode !== undefined)
-check('the table counts its rows and columns', tableNode.props['aria-rowcount'] === 3 && tableNode.props['aria-colcount'] === 6, JSON.stringify({ rows: tableNode.props['aria-rowcount'], cols: tableNode.props['aria-colcount'] }))
+check('the table counts its rows and columns', tableNode.props['aria-rowcount'] === 4 && tableNode.props['aria-colcount'] === 6, JSON.stringify({ rows: tableNode.props['aria-rowcount'], cols: tableNode.props['aria-colcount'] }))
 const headers = consoleRead.elements.filter((node) => node.props.role === 'columnheader')
 check('every column has a header cell', headers.length === 6, String(headers.length))
 const cells = consoleRead.elements.filter((node) => node.props.role === 'cell')
-check('every rendered row carries its cells', cells.length === 12, String(cells.length))
+check('every rendered row carries its cells', cells.length === 18, String(cells.length))
 check(
   'rows are numbered after the header',
   consoleRead.elements.filter((node) => node.props.role === 'row' && node.props['aria-rowindex'] !== undefined)
-    .map((node) => node.props['aria-rowindex']).join(',') === '1,2,3',
+    .map((node) => node.props['aria-rowindex']).join(',') === '1,2,3,4',
 )
 
 /* ------------------------------------------------------------ bulk bar red */
@@ -505,6 +506,10 @@ check(
 overlayStore.value = { ...overlayStore.value, phase: 'done', message: '', leftovers: 0, descendantsUnresolved: true }
 read = collect(renderComponent(single.component, overlayProps))
 check('an unresolved family is not toasted as a clean deletion', read.texts.join(' ').includes('toast.incomplete'))
+
+overlayStore.value = { ...overlayStore.value, phase: 'done', message: '', leftovers: 0, descendantsUnresolved: false, directoriesUnresolved: true }
+read = collect(renderComponent(single.component, overlayProps))
+check('an unfinished directory scan is not toasted as a clean deletion', read.texts.join(' ').includes('toast.incomplete'))
 
 check('the overlay injects the console api', typeof overlayFace.consoleApi === 'object')
 

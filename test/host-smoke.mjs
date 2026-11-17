@@ -95,17 +95,36 @@ await mkdir(grandchild, { recursive: true })
 await mkdir(unrelated, { recursive: true })
 await mkdir(kept, { recursive: true })
 await mkdir(emptyProject, { recursive: true })
+const fork = join(project, 'session-manager-fork')
+await mkdir(fork, { recursive: true })
 await mkdir(cacheDir, { recursive: true })
 await writeFile(join(target, 'session.v4.jsonl.zstd'), 'log')
 await writeFile(join(child, 'session.v4.jsonl.zstd'), 'log')
 await writeFile(join(grandchild, 'session.v4.jsonl.zstd'), 'log')
 await writeFile(join(unrelated, 'session.v4.jsonl.zstd'), 'log')
 await writeFile(join(kept, 'session.v4.jsonl.zstd'), 'log')
+await writeFile(join(fork, 'session.v4.jsonl.zstd'), 'log')
 await writeFile(join(cacheDir, 'session-manager-test.json'), '{"rows":[]}')
 await writeFile(join(cacheDir, 'session-manager-child.json'), '{"rows":[]}')
 await writeFile(join(cacheDir, 'session-orphan-one.json'), 'x'.repeat(100))
 await writeFile(join(cacheDir, 'session-orphan-two.json'), 'y'.repeat(50))
 await writeFile(join(cacheDir, 'session-keep-test.json'), '{"rows":[]}')
+// Per-record backups left by the storage layer: one names the Session that is
+// about to be deleted, one names a Session that must survive.
+await writeFile(join(cacheDir, 'session-manager-test.json.bak.202601010000'), '{"rows":["old"]}')
+await writeFile(join(cacheDir, 'session-manager-fork.json.bak.202601010000'), '{"rows":["old"]}')
+// Third-party plugin caches that also keep Session ids.
+await mkdir(join(storagesDir, 'dsh-context'), { recursive: true })
+await writeFile(join(storagesDir, 'dsh-context', 'overview-cache.v1.json'), JSON.stringify({
+  sessions: [
+    { session: { id: 'session-manager-test', title: 'target' }, identity: { path: 'a' } },
+    { session: { id: 'session-keep-test', title: 'keep' }, identity: { path: 'b' } },
+  ],
+}, null, 2))
+await mkdir(join(base, 'dsh-claude-style'), { recursive: true })
+await writeFile(join(base, 'dsh-claude-style', 'usage.json'), JSON.stringify({
+  sessions: { 'session-manager-test': { turns: 1 }, 'session-keep-test': { turns: 2 } },
+}, null, 2))
 
 // Two storage backups, one naming a Session that is about to be deleted and one
 // naming only live Sessions. Only the first may be rewritten.
@@ -192,6 +211,9 @@ const headers = [
   { id: 'session-manager-grandchild', createdAt: 3, parentSession: 'session-manager-child', origin: 'subagent' },
   { id: 'session-unrelated', createdAt: 4, parentSession: 'session-other', origin: 'subagent' },
   { id: 'session-keep-test', createdAt: 5 },
+  // A fork records the source id as `parentSession` but has no `origin`: it is a
+  // first-class Session, not a sub-agent, and must never be deleted with its source.
+  { id: 'session-manager-fork', createdAt: 6, parentSession: 'session-manager-test', isSeeded: true },
 ]
 services.set('sessionQuery', {
   async listSessions() {
@@ -239,9 +261,10 @@ async function call(route, request) {
 
 let result = await call(inventory, makeRequest({ method: 'GET' }))
 check('the inventory route answers GET', result.response.status === 200 && result.payload.ok === true)
-check('the inventory route maps headers', result.payload.sessions.length === 5, JSON.stringify(result.payload.sessions))
+check('the inventory route maps headers', result.payload.sessions.length === 6, JSON.stringify(result.payload.sessions))
 check('the inventory route keeps creation times', result.payload.sessions[0].createdAt === 1)
 check('the inventory route reports parent and origin', result.payload.sessions[1].parentId === 'session-manager-test' && result.payload.sessions[1].origin === 'subagent')
+check('the inventory route keeps a fork as a top-level Session', result.payload.sessions[5].parentId === 'session-manager-test' && result.payload.sessions[5].origin === null)
 
 result = await call(inventory, makeRequest({ method: 'POST' }))
 check('the inventory route refuses POST', result.response.status === 405 && result.response.headers.allow === 'GET')
@@ -315,6 +338,14 @@ check(
 check('the purge kept the unrelated sibling logs', existsSync(kept) && existsSync(unrelated))
 check('the purge reports three removed directories', Array.isArray(result.payload.directories) && result.payload.directories.length === 3, JSON.stringify(result.payload.directories))
 check('a clean purge reports no leftovers', Array.isArray(result.payload.leftovers) && result.payload.leftovers.length === 0)
+check('the purge keeps a forked Session alive', existsSync(fork), 'fork directory was deleted')
+check('the purge removes the dead per-record backup', !existsSync(join(cacheDir, 'session-manager-test.json.bak.202601010000')))
+check('the purge keeps the live per-record backup', existsSync(join(cacheDir, 'session-manager-fork.json.bak.202601010000')))
+check('the purge reports the per-record backups it removed', result.payload.backupsRemoved === 1, JSON.stringify(result.payload))
+const overview = JSON.parse(await readFile(join(storagesDir, 'dsh-context', 'overview-cache.v1.json'), 'utf8'))
+check('the purge scrubs a third-party cache entry', overview.sessions.length === 1 && overview.sessions[0].session.id === 'session-keep-test', JSON.stringify(overview))
+const usage = JSON.parse(await readFile(join(base, 'dsh-claude-style', 'usage.json'), 'utf8'))
+check('the purge scrubs a third-party usage ledger', usage.sessions['session-manager-test'] === undefined && usage.sessions['session-keep-test'] !== undefined, JSON.stringify(usage))
 
 // A second purge of the same Session stays harmless.
 result = await call(purge, makeRequest({ body: JSON.stringify({ sessionId: 'session-manager-test' }) }))
@@ -413,13 +444,22 @@ services.set('sessionProjectionCache', { table: { keys() { throw new Error('tabl
 result = await call(cacheUpkeep, makeRequest({ body: '{}' }))
 check('cache housekeeping reports an unreadable cache', result.response.status === 200 && result.payload.skipped === 'projection-cache-unreadable', JSON.stringify(result.payload))
 
-// A Host whose storages directory is missing cannot sweep backups at all. The
-// directory is the sessions root's sibling, so both have to be absent.
-const orphanRoot = join(base, 'orphan-home', 'sessions')
-await mkdir(join(base, 'orphan-home'), { recursive: true })
+// A Host whose storages path is a file cannot sweep backups at all.
+const orphanHome = join(base, 'orphan-home')
+const orphanRoot = join(orphanHome, 'sessions')
+await mkdir(orphanRoot, { recursive: true })
+await writeFile(join(orphanHome, 'storages'), 'not a directory', 'utf8')
 services.set('sessionPersistence', { root: orphanRoot, async flush() {} })
 result = await call(backupUpkeep, makeRequest({ body: '{}' }))
 check('backup housekeeping reports unreadable storages', result.response.status === 200 && result.payload.skipped === 'storages-unreadable', JSON.stringify(result.payload))
+
+// A sessions root that cannot be listed is not an empty one: every sweep that
+// deletes by "unknown id" has to refuse before it touches the registry.
+services.set('sessionPersistence', { root: join(base, 'orphan-home', 'missing-sessions'), async flush() {} })
+result = await call(backupUpkeep, makeRequest({ body: '{}' }))
+check('backup housekeeping refuses an unreadable sessions root', result.response.status === 200 && result.payload.skipped === 'sessions-unreadable', JSON.stringify(result.payload))
+result = await call(cacheUpkeep, makeRequest({ body: '{}' }))
+check('cache housekeeping refuses an unreadable sessions root', result.response.status === 200 && result.payload.skipped === 'sessions-unreadable', JSON.stringify(result.payload))
 
 // Without the sessions root the known set would hold only the live store: every
 // log on disk would look deleted. Both sweeps have to refuse, and the registry
@@ -456,6 +496,18 @@ check(
   JSON.stringify(result.payload),
 )
 
+// A sessions root that exists but cannot be listed must not be reported as a
+// clean deletion: the logs are still there, so the caller has to be told.
+const brokenRoot = join(base, 'broken-sessions')
+await writeFile(brokenRoot, 'not a directory')
+services.set('sessionPersistence', { root: brokenRoot, async flush() {}, async list() { return headers.map((header) => ({ header })) } })
+result = await call(purge, makeRequest({ body: JSON.stringify({ sessionId: 'session-ghost-test' }) }))
+check(
+  'an unreadable sessions root is reported as unfinished',
+  result.response.status === 200 && result.payload.directoriesUnresolved === true,
+  JSON.stringify(result.payload),
+)
+
 // A real fault is a 500, not a crash.
 services.set('sessionPersistence', {
   root,
@@ -478,7 +530,7 @@ services.set('sessionQuery', { async listSessions() { throw new Error('index off
 result = await call(inventory, makeRequest({ method: 'GET' }))
 check(
   'an inventory falls back to the persistence listing',
-  result.response.status === 200 && Array.isArray(result.payload.sessions) && result.payload.sessions.length === 5,
+  result.response.status === 200 && Array.isArray(result.payload.sessions) && result.payload.sessions.length === 6,
   JSON.stringify(result.payload),
 )
 

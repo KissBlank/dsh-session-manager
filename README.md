@@ -48,13 +48,15 @@
 1. **停止活动**：中断该会话正在跑的轮次、结束它的后台任务，等它真正静下来（最多 3 秒）；
 2. **从所有窗口移除**：会话即时从每个窗口的列表里消失；
 3. **清掉归属与标记**：从各工作区的会话列表中摘除，并清除它的归档、置顶记录；
-4. **连带子会话**：递归找出它的所有子代理会话（含多级），一并按同样步骤处理——这些子会话的日志同样落在磁盘上，只删父会话会留下读不到的残骸；
+4. **连带子会话**：递归找出它的所有子代理会话（含多级），一并按同样步骤处理——这些子会话的日志同样落在磁盘上，只删父会话会留下读不到的残骸。fork 出来的分支会话不算子代理，它们是独立会话，不会被连带删除；
 5. **删除日志目录**：`<DSH_HOME>/sessions/<工作区>/<会话 id>/`，父会话与每个子会话各一份；
-6. **删除投影缓存**：该会话及其子会话在 `storages/session_projcache` 下的缓存文件。
+6. **删除投影缓存**：该会话及其子会话在 `storages/session_projcache` 下的缓存文件，以及它们遗留的逐条备份（`<会话 id>.json.bak.<时间戳>`）。
 
-删除前会先让宿主把写缓冲落盘并释放文件句柄，避免 Windows 上「文件仍被占用」导致删一半；真遇到删不掉的目录，接口会把它列在 `leftovers` 里而不是假装成功。子会话关系读不到时（宿主的两份会话清单互相矛盾），会回落到直接读日志目录；两份都读不到才标记 `descendantsUnresolved`，控制台会把这批算作「有文件未删净」而不是干净删除。
+删除前会先让宿主把写缓冲落盘并释放文件句柄，避免 Windows 上「文件仍被占用」导致删一半；真遇到删不掉的目录，接口会把它列在 `leftovers` 里而不是假装成功。子会话关系读不到时（宿主的两份会话清单互相矛盾），会回落到直接读日志目录；两份都读不到才标记 `descendantsUnresolved`，控制台会把这批算作「有文件未删净」而不是干净删除。日志目录本身读不出来时标记 `directoriesUnresolved`，同样按「有文件未删净」提示。
 
-**不会删**：工作区里的代码与文件、其他会话、跨会话共享的附件库、任何设置与凭据。
+删除后还会尽力清掉其他插件写在 `<DSH_HOME>/storages` 与 `<DSH_HOME>/<插件目录>/*.json` 里的会话引用（例如 `dsh-context` 的 overview 缓存、`dsh-claude-style` 的用量记录）；如果某个插件把缓存放在别处，那一份需要它自己刷新。
+
+**不会删**：工作区里的代码与文件、其他会话、fork 出来的分支会话、跨会话共享的附件库、任何设置与凭据。
 
 **没有回收站**——删了就是删了。磁盘未分配空间与你自己做的外部备份不在插件控制范围内；宿主自己保留的 `workspace.json.bak-*` 备份里的残留 id，可以用上面「清理陈旧备份」抹掉。
 
@@ -69,8 +71,8 @@
 
 在插件管理器的安装入口填下面任一写法：
 
-- npm 包名：`@kissblank/dsh-session-manager`（可锁版本：`@kissblank/dsh-session-manager@1.0.5`）
-- GitHub：`github:KissBlank/dsh-session-manager`（可锁 tag：`github:KissBlank/dsh-session-manager#v1.0.5`）
+- npm 包名：`@kissblank/dsh-session-manager`（可锁版本：`@kissblank/dsh-session-manager@1.0.6`）
+- GitHub：`github:KissBlank/dsh-session-manager`（可锁 tag：`github:KissBlank/dsh-session-manager#v1.0.6`）
 - 本地：填本仓库的绝对路径
 
 1.0.0 起仓库名与 npm 包名统一为 `@kissblank/dsh-session-manager`，版本号也从 1.0.0 重新开始（更早的 0.x 版本与试验用的包名均已下线）。
@@ -97,11 +99,11 @@
 
 ### What a deletion touches
 
-It stops the Session (its running turn and backend jobs, up to 3 s of settling), drops it from every window's list immediately, detaches it from each Workspace and clears its archive/pin records, follows its sub-agent Sessions to any depth and deletes those too, removes every log directory under `<DSH_HOME>/sessions/<project>/<id>/`, and deletes the projection-cache records of the whole family.
+It stops the Session (its running turn and backend jobs, up to 3 s of settling), drops it from every window's list immediately, detaches it from each Workspace and clears its archive/pin records, follows its sub-agent Sessions to any depth and deletes those too, removes every log directory under `<DSH_HOME>/sessions/<project>/<id>/`, and deletes the projection-cache records and per-record backups (`<id>.json.bak.<stamp>`) of the whole family. A forked branch is a Session in its own right, not a sub-agent, so it is never carried away with its source.
 
-The Host is flushed before anything is unlinked, so Windows does not fail on a file still held open; a directory that could not be removed is reported back in `leftovers` instead of being counted as deleted. When the child lookup cannot answer — the Host's live and persisted corpora disagree about one Session — the raw persistence listing is used instead; only if both fail is the family marked `descendantsUnresolved`, and the console counts that batch as leaving files behind rather than reporting a clean sweep.
+The Host is flushed before anything is unlinked, so Windows does not fail on a file still held open; a directory that could not be removed is reported back in `leftovers` instead of being counted as deleted. When the child lookup cannot answer — the Host's live and persisted corpora disagree about one Session — the raw persistence listing is used instead; only if both fail is the family marked `descendantsUnresolved`, and the console counts that batch as leaving files behind rather than reporting a clean sweep. A sessions root that cannot be listed is marked `directoriesUnresolved` and treated the same way. After the removal, best-effort scrubbing also drops the deleted ids from JSON caches other plugins keep under `<DSH_HOME>/storages` and `<DSH_HOME>/<plugin>/*.json`; a plugin that stores its cache elsewhere has to refresh it itself.
 
-Workspace files, other Sessions, the shared attachment store, settings and credentials are **not** touched. There is no trash: deletion is final, and stale ids left in Host-owned `workspace.json.bak-*` backups or in the live archive/pin sets can be scrubbed from the same `⋯` menu.
+Workspace files, other Sessions, forked branches, the shared attachment store, settings and credentials are **not** touched. There is no trash: deletion is final, and stale ids left in Host-owned `workspace.json.bak-*` backups or in the live archive/pin sets can be scrubbed from the same `⋯` menu.
 
 ### Guards
 
@@ -109,7 +111,7 @@ If any selected Session is running, the dialog says how many, and its red confir
 
 ### Install
 
-Install through the plugin manager with any of these specs: `@kissblank/dsh-session-manager` (pin with `@1.0.5`), `github:KissBlank/dsh-session-manager` (pin with `#v1.0.5`), or a local absolute path. Then **restart the DSH desktop app** — a page reload is not enough, because the Host decides which plugins the browser loads when it starts. Afterwards, while working on this repository, UI changes come alive on a page reload and Host-side changes need a restart.
+Install through the plugin manager with any of these specs: `@kissblank/dsh-session-manager` (pin with `@1.0.6`), `github:KissBlank/dsh-session-manager` (pin with `#v1.0.6`), or a local absolute path. Then **restart the DSH desktop app** — a page reload is not enough, because the Host decides which plugins the browser loads when it starts. Afterwards, while working on this repository, UI changes come alive on a page reload and Host-side changes need a restart.
 
 ### Compatibility
 

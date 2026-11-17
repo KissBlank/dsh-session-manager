@@ -4,6 +4,25 @@
 
 > 目前只支持 `dsh >= 0.2.0-rc.1 < 0.3.0-0`（见 `package.json` 的 `engines`）。依赖宿主内部形状的地方与发版流程见 `RELEASE.md`，DSH 升级后请先跑冒烟测试。
 
+## [1.0.6] - 2026-11-17
+
+### 修复
+
+- **fork 出来的分支被当成子会话删掉**：宿主的 fork 只写 `parentSession`、不写 `origin`，原实现按 `parentSession` 递归，把用户可见的 fork 分支一起删了。现在只把 `origin === 'subagent'` 的记录算作子会话，fork 保留；控制台也不再隐藏 fork，可作为一等会话管理。
+- **会话根目录读不出来时清扫误判**：`projectDirectories` / `knownSessionIds` 在 `readdir` 失败时返回空列表，两个清扫会把落盘会话当成已删——删投影缓存、清归档/置顶、抹备份里的 id。现在读取失败返回 `resolved: false`，清扫报 `skipped: 'sessions-unreadable'` 且不改任何状态；`pruneEmptyProjects` 同样报 skipped。
+- **日志目录扫描失败假装删干净**：`findSessionDirectories` 读不出目录时返回 `[]`，删除接口会报成功而日志还在。现在返回 `null`，删除结果新增 `directoriesUnresolved`，控制台按「有文件未删净」提示。
+- **逐条备份永不清理**：存储层写坏的记录会改名成 `<id>.json.bak.<时间戳>`，原先只扫顶层 `.bak-*`。现在备份清扫也扫 `storages/<unit>/<table>/` 下的逐条备份，删除会话时同步清掉该会话的逐条备份。
+- **第三方缓存留痕**：删除后尽力清理 `<DSH_HOME>/storages` 与 `<DSH_HOME>/<插件目录>/*.json` 里指向已删会话的条目（`dsh-context` 的 overview、`dsh-claude-style` 的 usage 等），失败静默。
+- **迟到的子会话没有等静默**：停止后补捞的子会话只释放句柄、没有等待，Windows 上可能删不掉。现在与主流程共用静默预算。
+- **备份清扫先改状态再报错**：`pruneStaleBackups` 先清归档/置顶、再检查存储目录，目录不可用时报告 skipped 但状态已改。现在先读目录、再动 registry。
+- **单条删除可以并发**：菜单项与 `run()` 都没有 phase 守卫，先删 A 再删 B 会覆盖弹窗并让两次删除同时跑。现在运行中的删除不会被新请求覆盖。
+- **进度对话框焦点与关闭**：批量进度框补上 Tab 焦点陷阱；删除进行中控制台关闭按钮禁用，避免丢失进度。
+- **`inventory` 丢弃宿主错误信息**：失败时优先透出 `body.message`，不再只报 `HTTP <status>`。
+
+### 测试
+
+- 宿主冒烟 66 → **76** 项（新增 fork 保留、逐条备份清理、第三方缓存清理、根目录不可读、日志目录扫描未完成等用例）；客户端冒烟 114 → **116** 项（新增 fork 行、目录扫描未完成的警示断言）。
+
 ## [1.0.5] - 2026-11-15
 
 ### 修复
